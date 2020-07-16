@@ -141,3 +141,42 @@ public class ReplicaManager {
 
 
 
+
+
+## 4. 内存分区
+
+```java
+public class Kafka {
+  
+  private static ReplicaFetcher fetcher = new FeplicatFetcher();
+  
+	public static void main() {
+		loadReplicasFromDisk();
+	}
+
+
+ 	public static void loadReplicasFromDisk() {
+      ReplicaManager replica = new ReplicaManager();
+    	replica.load();
+  }
+  
+  public static void fetchReplicaFromRemote() {
+  	fetcher.fetch():
+  }
+}
+```
+
+![](./images/jvm-10.png)
+
+静态变量fetcher 长期存在
+
+loadReplicasFromDisk 执行完，replicaManger就会回收。
+
+**老年代**：长期存在
+
+**年轻代**：大部分对象存活时间短，先放在年轻代
+
+**永久代**：存放类信息
+
+
+
