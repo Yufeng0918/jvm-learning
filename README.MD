@@ -64,7 +64,11 @@ public class Kafka {
 
 ### 1.4 Tomcat的类加载机制
 
-+ Tomcat 自定义了Common，Catalina,  Shared 等类加载器，加载自己的核心内库
++ Tomcat 自定义了Common，Catalina,  Shared 等类加载器，加载自己的核心内库，使用线程上下文加载器打破双亲机制
+
+  ```
+  Thread.currentThread().setContextClassLoader(catalinaLoader)
+  ```
 
 + 每个webapp有一个对应的webapp类加载器
 
@@ -80,13 +84,7 @@ public class Kafka {
 
 
 
-
-
-
-
-
-
-## 2. 内存区域
+## 2. JVM内存模型
 
 **方法区**（jdk1.8以后，这块区域叫元数据空间）：存放类似常量池的东西和各种类相关的信息
 
@@ -125,7 +123,7 @@ public class ReplicaManager {
 
 
 
-## 3. 垃圾回收
+## 3. 什么是垃圾回收
 
 后台自动运行的线程，不断检查jvm堆中各个实例对象
 
@@ -262,3 +260,177 @@ public class Payorder {
 #### 4.3.2 永久代和栈内存
 
 老年代一般**几百MB**，栈内存一般**512kb到1MB**
+
+
+
+## 5. 垃圾回收详解
+
+### 5.1 垃圾回收对象
+
+JVM 使用可达性分析算法来判断哪些对象可以被回收。分析谁在引用，是否有一个**GC Roots**
+
+**方法的局部变量**和**静态变量**都是一种GC Roots
+
+
+
+### 5.2 引用类型
+
+#### 强引用
+
+强引用就是一个变量引用一个对象；该被引用的堆中的对象，宁可报OutOfMemoryError错误，也都不会被回收。
+
+```java
+public class Kafka {
+  private static ReplicaFetcher fetcher = new FeplicatFetcher();
+}
+```
+
+
+
+#### 软引用
+
+软引用，在java中就是被SoftReference包裹起来的对象；只有内存不够了，才会被回收。
+
+```java
+public class Kafka {
+  private static SoftReference<ReplicaFetcher> fetcher = new SoftReference<ReplicaFetcher>(new FeplicatFetcher());
+}
+```
+
+
+
+#### 弱引用
+
+弱引用的的表达形式和软应用类似，就是通过WeakReference包裹起来的对象；弱引用的效果几乎和没引用差不多，所以只要垃圾回收，它就会被回收。
+
+```java
+public class Kafka {
+  private static WeakReference<ReplicaFetcher> fetcher = new WeakReference<ReplicaFetcher>(new FeplicatFetcher());
+}
+```
+
+
+
+### 5.3 垃圾回收算法
+
+#### 5.3.1 标记算法
+
+![](./images/jvm-20.png)
+
+**老年代垃圾回收算法**，标记垃圾对象，保留存活对象，造成大量的内存碎片，可能导致**没有足够的内存空间来分配新的对象**
+
+
+
+#### 5.3.2 复制算法
+
+![](./images/jvm-17.png)![](./images/jvm-18.png)
+
+**新生代垃圾回收算法**，标记垃圾对象，一次性吧原来内存区域清空，避免了内存碎片。**只有一半内存可用，使用效率低**
+
+**算法优化**
+
+![](./images/jvm-19.png)
+
+新生中的内存比例从等额的两份调整为 **Eden:Survivor:Survivor=8:1:1**的三部分，每次只使用Eden和其中一个Survivor区，当它们都占满了时触发Minor GC，将Eden和其中一个Survivor区的存活对象都迁移到另外一个Survivor区中,此时另外一个Survivor开始被闲置直到下一次Minor GC和另外一个Survivor交换。
+
+**始终保持一块survivor是空的**，循环使用三块内存区域，**只有10%的内存空间是闲置的**
+
+经过15次GC以后，新生代对象进入老年代 **-XX:MaxTenuringThreshold=15** 
+
+
+
+### 5.4 对象年龄判断
+
+#### 动态年龄规则
+
+如果年龄1 + 年龄2 + 年龄n的对象总和超过了survivor区域的50%，**会把年龄n以上的对象放入老年代**
+
+
+
+#### 大对象直接进入老年代
+
+**-XX:PretenureSizeThreshold** 设置大对象，1048576就是1MB
+
+
+
+#### MinorGC后对象太多无法放入Survivor
+
+如果发现对象超过survivor中的一个区，无法放入，直接进入老年代
+
+
+
+### 5.5 垃圾回收器类型
+
+**Serial/SerialOld**: 分别用于新生代和老年代，垃圾回收时工作现场卡住
+
+**ParNew/CMS**: 新生代和老年代的多线程并发
+
+**G1**: 统一新生代和老年代，更加优秀的算法
+
+
+
+### 5.6 STOP WORLD 问题
+
+![](./images/jvm-25.png)
+
+标记Eden里面的垃圾对象，一次性清理Eden和Survivor内存空间。这时候不允许在Eden中创建对象。进入“**STOP THE WORLD**”
+
+![](./images/jvm-26.png)
+
+垃圾回收完毕，代码才可以继续运行
+
+
+
+### 5.7 新生代进入老年代
+
+阶段一, Eden 区域满了，检查**新生代所有对象是否大于老年代**
+
++ 如果小于，进行Minor GC
++ 如果大于，进入阶段二
+
+阶段二，查看**-XX:-HandlePromotionFailure** 是否设置
+
++ 如果没有设置或者大于，进行FullGC
++ 如果设置，进入阶段三
+
+阶段三，**判断老年代空间是否大于MinorGC后进入老年代平均大小**
+
++ 如果大于，MinorGC
++ 如果小于，FullGC
+
+
+
+## 案列
+
+### Survivor内存优化
+
+![](./images/jvm-21.png)
+
+每次计算10秒，每分钟100次计算，每次任务产生10MB左右对象，一分钟后eden就基本满了
+
+**第一**，**看看老年代可用空间是否大于新生代全部对象**，老年代1.5GB可用，新生代1.2GB可用，那么直接MinorGC。
+
+每个任务10秒，80个计算任务结束，还有20个计算任务总公共200MB对象存活。
+
+![](./images/jvm-22.png)
+
+200MB的对象不能放入survior区，因为每块survivor区域只有100MB空间，200MB对象会直接进入老年代
+
+
+
+![](./images/jvm-23.png)
+
+第三次MinorGC 以后，老年代只有1.1G，是放不下1.2G对象的
+
+**第二，-XX:-HandlePromotionFailure 参数被打开，看看老年代可用空间是否大于历次 Minor GC过后进入老年代对象大小**
+
+足够，所以进行Minor GC。**如果参数关闭或者担保失败，可能提前触发Full GC**
+
+
+
+**7分钟后，老年代空间不够，触发Full GC**
+
+![](./images/jvm-24.png)
+
+**优化方案**：**增加Survivor区域大小**或者**修改-XX:SurvivorRatio=8 这个参数**， 避免对象直接进入老年代
+
