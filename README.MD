@@ -341,19 +341,21 @@ public class Kafka {
 
 ### 5.4 对象年龄判断
 
-#### 动态年龄规则
+#### 5.4.1 动态年龄规则
+
+如果一批对象的总和大于survivor区域的50%，那么此时触发动态年龄判断
 
 如果年龄1 + 年龄2 + 年龄n的对象总和超过了survivor区域的50%，**会把年龄n以上的对象放入老年代**
 
 
 
-#### 大对象直接进入老年代
+#### 5.4.2 大对象直接进入老年代
 
 **-XX:PretenureSizeThreshold** 设置大对象，1048576就是1MB
 
 
 
-#### MinorGC后对象太多无法放入Survivor
+#### 5.4.3 MinorGC后对象太多无法放入Survivor
 
 如果发现对象超过survivor中的一个区，无法放入，直接进入老年代
 
@@ -381,7 +383,7 @@ public class Kafka {
 
 
 
-### 5.7 新生代进入老年代
+### 5.7 新生代进入老年代详细过程
 
 阶段一, Eden 区域满了，检查**新生代所有对象是否大于老年代**
 
@@ -400,9 +402,7 @@ public class Kafka {
 
 
 
-## 案列
-
-### Survivor内存优化
+## 6. 案列分析：Survivor内存优化
 
 ![](./images/jvm-21.png)
 
@@ -434,3 +434,230 @@ public class Kafka {
 
 **优化方案**：**增加Survivor区域大小**或者**修改-XX:SurvivorRatio=8 这个参数**， 避免对象直接进入老年代
 
+
+
+
+
+## 7. ParNew垃圾回收器
+
+![](./images/jvm-27.png)
+
+**新生代多线程**垃圾回收, **-XX:+UseParNewGC** 开启ParNew垃圾回收器
+
+默认垃圾回收线程数和CPU核树一样, **-XX:ParallelGCThreads**指定线程数量
+
+新生代标记的时候需要STOP THE WORLD，**标记处GC Root的少量存活对象**，移动到一个survivor区域，清空eden和另一个survivor
+
+
+
+如果程序运行在**单核CPU，建议采用Serial**垃圾回收期来**减少上下文切换**
+
+
+
+## 8. CMS垃圾回收器
+
+![](./images/jvm-28.png)
+
+**阶段一**：**初始标记**，进入STOP THE WORLD状态，速度较快，**只标记GC Root直接引用的对象**
+
+![](./images/jvm-29.png)
+
+**阶段二**：**并发标记**，工作线程可以随意创建新的对象。**对GC Root追踪，那些对象被GC Root间接引用**，最耗时
+
+![](./images/jvm-30.png)
+
+
+
+**阶段三：重新标记**，再次进入STOP THE WORLD，**对老年代说有对象进行GC Roots追踪**， 只对阶段二中变动的少数对象进行标记
+
+
+
+![](./images/jvm-31.png)
+
+**阶段四：并发清理**，这个阶段最耗时，但是不影响系统执行
+
+
+
+在并发标记和并发清理时最耗时，垃圾回收线程和工作线程同时运行，导致CPU资源被垃圾回收线程占用一部分，CMS默认启动垃圾回收的线程数量是 **(CPU核数 + 3)/4**
+
+
+
+当并发清理的时候，新生代有对象进入老年代变成**”浮动对象“**而并不被清理，这时候需要保证**老年代有一定预留空间。-XX:CMSInitiatingOccupancyFraction**来设置老年代占用比例。JDK1.6默认是92%。**如果大于，会自动进FullGC**
+
+
+
+如果CMS垃圾回收期间，程序要放入老年代的对象大于可用空间，**发生Concurrent Mode Failure**
+
+
+
+**如果发生Concurrent Mode Failure, 会自动启用 SerialOld来代替CMS**，STOP THE WORLD，重新对GC Roots追踪，并标记全部垃圾对象，不允许产生新的对象。
+
+
+
+**-XX:+UseCMSCompactAfFullCollection 默认开启**，在FullGC结束以后，再次进入STOP THE WOLRD，停止工作线程，进行碎片整理，避免内存碎片**。-XX:CMSFullGCsBeforeCompaction，执行多少次Full GC之后再次执行一个内存碎片整理**。
+
+**老年代的垃圾回收币新生代慢10倍以上**
+
+
+
+## 9. 案列分析：ParNew和CMS参数
+
+### 9.1 新生代参数
+
+JVM 4G，分配给堆内存3G，每个线程1M，几百个线程就几百M，永久代256M
+
+1秒产生60MB，新生代1.5G，Eden1.2G的话20秒占满。存活对象150MB，那么survivor需要大于150M。调整新生代为2G，老年代1G，Eden1.6G， Survivor200MB。**避免新生代跳过survivor直接进入老年代**
+
+降低停留在新生代的时间到5次，结合系统运行模型考虑。指定大对象进入老年代和指定垃圾回收器
+
+```bash
+-Xms3072M Xmx3072M Xmn2048M Xss1M  –XX:PermSize=256M –XX:MaxPermSize=256M 
+–XX:SurvivorRatio=8  –XX:MaxTenuringThreshold=5  –XX:PretenureSizeThreshold=1M 
+```
+
+
+
+### 9.2 老年代参数设置
+
+-XX:-HandlePromotionFailure 在1.6以后废弃了，直接进入检查**老年代可用空间是否大于MinorGC后进入老年代的平均对象大小**
+
+计算第一次FullGC时机，过了高峰期，没有必要调整–XX:CMSInitiatingOccupancyFraction
+
+大对象很少设置，可以直接放入老年代，**避免在新生代频繁创建销毁**
+
+**并在FullGC以后进行内存整理**
+
+```bash
+-Xms3072M Xmx3072M Xmn2048M Xss1M  –XX:PermSize=256M –XX:MaxPermSize=256M 
+–XX:SurvivorRatio=8  –XX:MaxTenuringThreshold=5  –XX:PretenureSizeThreshold=1M 
+–XX:CMSInitiatingOccupancyFraction=92
+–XX:+UseCMSCompactAtFullCollection  –XX:CMSFullGCsBeforeCompaction=0
+```
+
+**注意**：新生代存活对象少，minor GC快，老年代存活对象多，full GC慢
+
+
+
+
+
+## 10. G1垃圾回收器
+
+![](./images/jvm-32.png)
+
+把堆分成大小相等的region，老年代和新生代只是逻辑是哪个的概念
+
+![](./images/jvm-33.png)
+
+设置垃圾回收的预期停顿时间，比如1小时内G1垃圾回收的STOP THE WORLD不能超过一分钟。G1对每个region追踪**回收价值**
+
+![](./images/jvm-34.png)
+
+G1追踪，1个Region中有10MB的垃圾对象，回收需要1s, 另一个Region中有20MB的垃圾对象，回收需要200ms。G1回收20MB的垃圾对象。
+
+
+
+![](./images/jvm-35.png) ![](./images/jvm-36.png)
+
+Region是可以转化的，在垃圾回收以后，Region可能转为新生代，也可能分配给老年代。
+
+
+
+![](./images/jvm-36.png)
+
+**-XX:+UseG1GC** 开启G1垃圾回收器，Region的大小是堆大小除以2048，比如堆大小是4G，那么每个region是2MB。也可以用**-XX:G1SHeapRegionSize** 来指定大小
+
+
+
+刚开始，**新生代只占堆内存5%，可以通过-XX:G1NewSizePercent**来设置新生代占比
+
+JVM会不停给新生代更多region，但是不**会超过60%，可以用过-XX:G1MaxNewSizePercen**t指定
+
+
+
+加入新生代有100个region，那么80个region是eden，两个survivor各占10个region
+
+新生代eden快满的时候，就会触发垃圾回收，可以用 **-XX:MaxGCPauseMills 来指定G1执行GC最多可以让系统停顿多久**
+
+![](./images/jvm-38.png)
+
+G1 有专门的区域来存放大对象，可能跨region，在新生代和老年代回收的时候，顺便回收大对象
+
+
+
+### 10.1 垃圾回收过程
+
+新生代回收采用**复制算法**
+
+
+
+**新生代+老年代混合回收**
+
+-XX:InitiatingHeapOccupancyPercent 是45%， 如果老年代占用堆内存45%的时候，会触发一个新生代+老年代的混合回收
+
+
+
+**初始标记**
+
+标记GC Root直接引用的对象, STOP THE WORLD
+
+
+
+**并发标记**
+
+从GC Root开始追踪所有存活的对象, 比如replicaFetcher 对象被GC Root对象间接关联，所有标记为存活
+
+![](./images/jvm-39.png)
+
+```java
+public class Kafa {
+	public static ReplicaManager replicaManager = new ReplicaManager();
+}
+
+publc class ReplicaManager {
+	public ReplicaFetcher replicaFetcher = new ReplicaFetcher();
+}
+```
+
+
+
+**最终标记**
+
+进入STOP THE WORLD, 标记存活和垃圾对象
+
+
+
+**混合回收**
+
+同时回收老年代，新生代，大对象。G1允许混合回收阶段执行多次混合回收。停止工作，执行一次混合回收，恢复工作，然后再次停止进行混合回收。可以用 **-XX:G1MixedGCCountTarget 设置，默认8次**
+
+
+
+### 10.2 参数设置
+
+**-XX:G1HeapWasterPercent 默认是5%**，一旦空闲出来的R**egion数量达到堆内存的5%**，就会停止本次混合回收
+
+**-XX:G1MixedGCLiveThresholdPercent默认是85%**，存活对象低于85%的region才会进行回收。 
+
+如果G1GC失败，会进行单线程垃圾回收
+
+
+
+## 11. 案列分析：G1参数
+
+![](./images/jvm-40.png)
+
+用户集中在晚上两三个小时，60W活跃用户，每个小时20W用户。一个小时内1200W次操作，3000/s。一般需要5台4核8G的机器来抗压，差不多600请求每台机器每秒。
+
+**一次请求5kb，那么一秒产生600个请求，占用3MB的内存**
+
+```bash
+-Xms4096M -Xmx4096M -Xss1M -XX:PermSize=256M -XX:MaxPermSize=256PM -XX:+UseG1GC
+```
+
+-XX:G1NewSizePercent 保持默认, -XX:G1MaxNewSizePercent 保持默认
+
+G1会分配多少个Region给新生代，多久触发一次新生代的gc, 每次多长时间无法提前预知。
+
+
+
+**-XX:MaxGCPauseMills** 要根据实际情况，如果过小，频繁触犯minor gc, 如果过大，停顿时候影响系统性能。
