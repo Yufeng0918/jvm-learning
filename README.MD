@@ -692,7 +692,9 @@ Mixed GC: G1专属，当老年代到达堆内存的45%
 
 
 
-## 14. GC 日志
+## 14. 日志
+
+### 14.1 Minor GC
 
 ```java
 public class Demo1 {
@@ -758,3 +760,136 @@ Heap
 
 程序退出前，内存分配。新生代有**未知对象和2MB数组**
 
+
+
+### 14.2 进入老年代
+
+```java
+public class Demo2 {
+    public static void main(String[] args) {
+        byte[] array1 = new byte[2 * 1024 * 1024];
+        array1 = new byte[2 * 1024 * 1024];
+        array1 = new byte[2 * 1024 * 1024];
+        array1 = null;
+
+        byte[] array2 = new byte[128 * 1024];
+
+        byte[] array3 = new byte[2 * 1024 * 1024];
+        array3 = new byte[2 * 1024 * 1024];
+        array3 = new byte[2 * 1024 * 1024];
+        array3 = new byte[128 * 1024];
+        array3 = null;
+
+        byte[] array4 = new byte[2 * 1024 * 1024];
+    }
+}
+
+```
+
+```LOG
+CommandLine flags: -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:MaxNewSize=10485760 -XX:MaxTenuringThreshold=15 -XX:NewSize=10485760 -XX:OldPLABSize=16 -XX:PretenureSizeThreshold=10485760 -XX:+PrintGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:SurvivorRatio=8 -XX:+UseCompressedClassPointers -XX:+UseCompressedOops -XX:+UseConcMarkSweepGC -XX:+UseParNewGC 
+0.092: [GC (Allocation Failure) 0.092: [ParNew: 7071K->566K(9216K), 0.0006375 secs] 7071K->566K(19456K), 0.0007126 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+0.093: [GC (Allocation Failure) 0.093: [ParNew: 7126K->0K(9216K), 0.0022067 secs] 7126K->558K(19456K), 0.0022577 secs] [Times: user=0.01 sys=0.00, real=0.01 secs] 
+Heap
+ par new generation   total 9216K, used 2212K [0x00000007bec00000, 0x00000007bf600000, 0x00000007bf600000)
+  eden space 8192K,  27% used [0x00000007bec00000, 0x00000007bee290e0, 0x00000007bf400000)
+  from space 1024K,   0% used [0x00000007bf400000, 0x00000007bf400000, 0x00000007bf500000)
+  to   space 1024K,   0% used [0x00000007bf500000, 0x00000007bf500000, 0x00000007bf600000)
+ concurrent mark-sweep generation total 10240K, used 558K [0x00000007bf600000, 0x00000007c0000000, 0x00000007c0000000)
+ Metaspace       used 2676K, capacity 4486K, committed 4864K, reserved 1056768K
+  class space    used 288K, capacity 386K, committed 512K, reserved 1048576K
+
+```
+
+
+
+![](./images/jvm-44.png)![](./images/jvm-45.png)
+
+第一次GC， array3的时候触发。GC 以后，survivor区域被128k和未知对象占据
+
+
+
+![](./images/jvm-46.png)
+
+第二次GC，array4的时候触发。GC以后，存活下来的对象超过survivor区50%，就把对象移动到老年代
+
+![](./images/jvm-47.png)
+
+最终eden区有一个2MB的数组，survivor区域都是空的
+
+
+
+```java
+public class Demo3 {
+
+    public static void main(String[] args) {
+        byte[] array1 = new byte[2 * 1024 * 1024];
+        array1 = new byte[2 * 1024 * 1024];
+        array1 = new byte[2 * 1024 * 1024];
+
+        byte[] array2 = new byte[128 * 1024];
+        array2 = null;
+        byte[] array3 = new byte[2 * 1024 * 1024];
+    }
+}
+```
+
+![](./images/jvm-48.png)
+
+![](./images/jvm-49.png)
+
+在分配array3之前，触发一次GC，存活对象是2MB 和 500K的未知对象。把array1移入老年代，array3放入新生代eden区域，未知对象在survivor区域。
+
+
+
+### 14.3 Full GC
+
+```java
+public class Demo4 {
+
+    public static void main(String[] args) {
+
+        byte[] array1 = new byte[4 * 1024 * 1024];
+        array1 = null;
+
+        byte[] array2 = new byte[2 * 1024 * 1024];
+        byte[] array3 = new byte[2 * 1024 * 1024];
+        byte[] array4 = new byte[2 * 1024 * 1024];
+        byte[] array5 = new byte[128 * 1024];
+
+        byte[] array6 = new byte[2 * 1024 * 1024];
+
+    }
+}
+```
+
+
+
+```
+CommandLine flags: -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:MaxNewSize=10485760 -XX:MaxTenuringThreshold=15 -XX:NewSize=10485760 -XX:OldPLABSize=16 -XX:PretenureSizeThreshold=3145728 -XX:+PrintGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:SurvivorRatio=8 -XX:+UseCompressedClassPointers -XX:+UseCompressedOops -XX:+UseConcMarkSweepGC -XX:+UseParNewGC 
+0.068: [GC (Allocation Failure) 0.068: [ParNew (promotion failed): 6943K->7389K(9216K), 0.0026386 secs]0.071: [CMS: 8194K->6567K(10240K), 0.0019821 secs] 11039K->6567K(19456K), [Metaspace: 2669K->2669K(1056768K)], 0.0047844 secs] [Times: user=0.01 sys=0.01, real=0.01 secs] 
+Heap
+ par new generation   total 9216K, used 2130K [0x00000007bec00000, 0x00000007bf600000, 0x00000007bf600000)
+  eden space 8192K,  26% used [0x00000007bec00000, 0x00000007bee14930, 0x00000007bf400000)
+  from space 1024K,   0% used [0x00000007bf500000, 0x00000007bf500000, 0x00000007bf600000)
+  to   space 1024K,   0% used [0x00000007bf400000, 0x00000007bf400000, 0x00000007bf500000)
+ concurrent mark-sweep generation total 10240K, used 6567K [0x00000007bf600000, 0x00000007c0000000, 0x00000007c0000000)
+ Metaspace       used 2676K, capacity 4486K, committed 4864K, reserved 1056768K
+  class space    used 288K, capacity 386K, committed 512K, reserved 1048576K
+```
+
+![](./images/jvm-50.png)
+
+array1是4MB， 所以直接进入老年代，array2，array3，array4，array5 进入Eden区域
+
+array6分配不下，触发一次Young GC。**ParNew (promotion failed): 6943K->7389K(9216K)**, 但是数据回收不掉，触发Full GC.
+
+
+
+FullGC 会触发一次Old GC, 同时还会触发Young GC和元空间GC
+
+![](./images/jvm-51.png)
+
+![](./images/jvm-52.png)
+
+**先把两个2MB的数组移入老年代，然后触发CMS，回收掉4MB的数组，再把2MB和128kb移入老年代**。年轻对象太多放不下老年代，就会触发Full GC.
