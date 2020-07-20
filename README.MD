@@ -893,3 +893,82 @@ FullGC 会触发一次Old GC, 同时还会触发Young GC和元空间GC
 ![](./images/jvm-52.png)
 
 **先把两个2MB的数组移入老年代，然后触发CMS，回收掉4MB的数组，再把2MB和128kb移入老年代**。年轻对象太多放不下老年代，就会触发Full GC.
+
+
+
+## 15. jstat工具
+
+### 15.1 打印数据
+
+jstat -gc PID Interval Times, e.g jstat -gc 1789 1000 10。每个1秒打印一次，总共打印10次。
+
++ S0C：Survivor0 的大小
++ S1C：Survivor1 的大小
++ S0U：Survivor0 使用了多少
++ S1U：Survivor1 使用了多少
++ EC：Eden 区的大小
++ EU：Eden 区使用了多少
++ OC：老年代的大小
++ OU：老年代使用了多少
++ MC：永久代的大小
++ MU：永久代使用了多少
++ YGC：YoungGC次数
++ YGCT：YoungGC的总耗时
++ FGC：Full GC次数
++ FGCT：Full GC的总耗时
+
+
+
+### 15.2 Eden 区对象的增长速度
+
+通过一行数据是看不出来Eden 区每秒增长多少数据的，所以我们才每秒打印一次，通过上一秒和下一秒EU的数据就可以推断出每秒增长了多少。这个数据进来多打印几行，取个平均值。
+
+
+
+### 15.3 Young GC 频率和耗时
+
+Eden区对象增长速度，可以推算多久触发一次YoungGC, YoungGC耗时，我们用YGCT除以YCG
+
+
+
+### 15.4 Young GC 后多少对象存活
+
+我们要确定每次存活的对象Survovir到底能不能放得下。我们要保证每次存活的对象要小于Survivor的50%，否则就会触发动态年龄审核机制。
+老年代对象增量速度通过每次YoungGC后老年代变化得出
+
+
+
+## 16. jmap
+
+-histo:live 打印class对象占用空间
+
+```
+ ./jmap -histo:live 4455
+
+ num     #instances         #bytes  class name
+----------------------------------------------
+   1:         80602        6894600  [C
+   2:          7412        2974560  [B
+   3:         80556        1933344  java.lang.String
+   4:         29835        1432080  com.sun.tools.javac.file.ZipFileIndex$Entry
+```
+
+
+
+**jmap -dump:live,format=b,file=dump.hprof 4455**
+
+导出jvm内存快照
+
+
+
+**jhat dump.hprof -port 7000**
+
+http:7000查看
+
+
+
+## 17. JVM 监控
+
++ Jstat, jmap, jhat 定时打印监控
+
++ Zabbix, OpenFalcon, Ganglia实时监控
