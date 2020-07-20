@@ -582,6 +582,8 @@ JVM会不停给新生代更多region，但是不**会超过60%，可以用过-XX
 
 G1 有专门的区域来存放大对象，可能跨region，在新生代和老年代回收的时候，顺便回收大对象
 
+**G1 适合大内存的机器**，通过设置卡顿时间解决
+
 
 
 ### 10.1 垃圾回收过程
@@ -661,3 +663,98 @@ G1会分配多少个Region给新生代，多久触发一次新生代的gc, 每�
 
 
 **-XX:MaxGCPauseMills** 要根据实际情况，如果过小，频繁触犯minor gc, 如果过大，停顿时候影响系统性能。
+
+
+
+## 12. GC名词
+
+Minor GC/Young GC: 新生代
+
+Old GC: 老年代
+
+Full GC: 新生代 + 老年代
+
+Mixed GC: G1专属，当老年代到达堆内存的45%
+
+
+
+## 13. 案列分析：百万并发的BI系统
+
+![](./images/jvm-41.png)
+
+每台机器500个请求，每个请求100kb，那么每秒产生50MB的数据
+
+3分钟左右，eden区被填满，触发Young GC, 而Young GC对系统影响不大。
+
+![](./images/jvm-42.png)
+
+请求增大，1分钟填满Eden，触发Young GC，回收内存增大，Young GC变慢。 **改用G1保证内次内存的GC时间**。
+
+
+
+## 14. GC 日志
+
+```java
+public class Demo1 {
+
+    public static void main(String[] args) {
+        byte[] array1 = new byte[1024 * 1024];
+        array1 = new byte[1024 * 1024];
+        array1 = new byte[1024 * 1024];
+        array1 = null;
+
+        byte[] array2 = new byte[2 * 1024 * 1024];
+    }
+}
+```
+
+![](./images/jvm-43.png)
+
+```bash
+-XX:NewSize=5242880 -XX:MaxNewSize=5242880 -XX:InitialHeapSize=10485760 -XX:MaxHeapSize=10485760 -XX:SurvivorRatio=8 -XX:PretenureSizeThreshold=10485760 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:ArrayAlloc.log
+```
+
+
+
+Array2 分配一个2MB的数组，而array1之前分配了3次1MB，没有多余空间，发生YoungGC
+
+```log
+0.143: [GC (Allocation Failure) 0.143: [ParNew: 3668K->399K(4608K), 0.0017235 secs] 3668K->1425K(9728K), 0.0018172 secs] [Times: user=0.01 sys=0.00, real=0.00 secs] 
+Heap
+ par new generation   total 4608K, used 3632K [0x00000007bf600000, 0x00000007bfb00000, 0x00000007bfb00000)
+  eden space 4096K,  78% used [0x00000007bf600000, 0x00000007bf928618, 0x00000007bfa00000)
+  from space 512K,  77% used [0x00000007bfa80000, 0x00000007bfae3c68, 0x00000007bfb00000)
+  to   space 512K,   0% used [0x00000007bfa00000, 0x00000007bfa00000, 0x00000007bfa80000)
+ concurrent mark-sweep generation total 5120K, used 1026K [0x00000007bfb00000, 0x00000007c0000000, 0x00000007c0000000)
+ Metaspace       used 3079K, capacity 4496K, committed 4864K, reserved 1056768K
+  class space    used 337K, capacity 388K, committed 512K, reserved 1048576K
+```
+
+
+
+**GC (Allocation Failure**：分配内存失败，触发GC
+
+**ParNew: 3668K->399K(4608K), 0.0017235 sec**
+
++ GC之前是3668k，**GC之后是399k**
++ GC执行时间是0.0017235s, 
++ 年轻代可用空间是4608 = 4096 + 512
++ array 占用3072， **有596的未知对象**
+
+**[Times: user=0.01 sys=0.00, real=0.00 secs]**： 本次gc消耗时间
+
+
+
+```
+Heap
+ par new generation   total 4608K, used 3632K [0x00000007bf600000, 0x00000007bfb00000, 0x00000007bfb00000)
+  eden space 4096K,  78% used [0x00000007bf600000, 0x00000007bf928618, 0x00000007bfa00000)
+  from space 512K,  77% used [0x00000007bfa80000, 0x00000007bfae3c68, 0x00000007bfb00000)
+  to   space 512K,   0% used [0x00000007bfa00000, 0x00000007bfa00000, 0x00000007bfa80000)
+ concurrent mark-sweep generation total 5120K, used 1026K [0x00000007bfb00000, 0x00000007c0000000, 0x00000007c0000000)
+ Metaspace       used 3079K, capacity 4496K, committed 4864K, reserved 1056768K
+  class space    used 337K, capacity 388K, committed 512K, reserved 1048576K
+```
+
+程序退出前，内存分配。新生代有**未知对象和2MB数组**
+
