@@ -1106,3 +1106,49 @@ http:7000查看
 
 开启**-XX:+CMSScavengeBeforeRemark**，在重新标记阶段，先执行一次Young GC，减少STOP THE WORLD时间。
 
+
+
+## 21. 案例分析：SoftRef引发的Metaspace的FUllGC
+
+![](./images/jvm-55.png)
+
+
+
+反射创建出来的都是软引用的，软引用GC 公式是 clock - timestamp < freespace * SoftRefLinkLRUPolicyMSPerMB
+
+假如jvm内存是3000，SoftRefLinkLRUPolicyMSPerMB 是1000， 3000 * 1000 = 3000s, 50分钟没有被访问才会被回收
+
+![](./images/jvm-56.png)
+
+**-XX:SoftRefLinkLRUPolicyMSPerMB=0** 对象不停地被回收，创建，导致平凡GC
+
+
+
+## 22. 案列分析：大对象引发的FullGC
+
+![](./images/jvm-57.png)
+
+```bash
+-Xms1536M -Xmx1536M -Xmn1024m -Xss256k -XX:SurvivorRatio=5 -XX:MaxTenuringThreshold=15 -XX:PretenureSizeThreshold=3145728 -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:CMSInitiatingOccupancyFraction=68
+```
+
+每隔20s会让300MB的 eden区触发一次Young GC，每隔30分钟会让老年代600MB的空间占满，触发一个CMS GC，耗时300ms。
+
+高峰期，偶尔一次会有几十MB对象进入老年代，偶尔一次。可以通过jmap工具导出一份内存快照，用Visual VM分析。**排查出select语句中没有wehere，导致大对象出现。大对象直接进入老年代，导致Full GC**
+
++ 不允许全表查询
++ 调整年轻代的大小，让对象进入Survivor区域。
++ 调整**-XX:CMSInitiatingOccupancyFraction**参数到92避免老年代频繁GC
+
+
+
+## 23. System GC 引发的 FullGC
+
+代码中有显示的去执行GC。
+
+```java
+System.gc()
+```
+
+**-XX:+DisableExplicitGC** 避免显示的去触发GC
+
