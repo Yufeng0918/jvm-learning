@@ -1142,7 +1142,7 @@ http:7000查看
 
 
 
-## 23. System GC 引发的 FullGC
+## 23. 案例分析：System GC 引发的FullGC
 
 代码中有显示的去执行GC。
 
@@ -1151,4 +1151,32 @@ System.gc()
 ```
 
 **-XX:+DisableExplicitGC** 避免显示的去触发GC
+
+
+
+## 24. 案例分析：对象常驻老年代引发Full GC
+
+```bash
+jmap -dump:format=b,file=file pid
+```
+
+分析出大量对象常驻老年代引发Full GC。内存泄露，**创建对象过多，占用大半老年代内存空间，是典型的内存泄露**
+
+**本地缓存没有限制大小，也没有LRU算法淘汰**。
+
+
+
+## 25. 案例分析：大量对象进入老年代引发Full GC
+
+![](./images/jvm-58.png)
+
+Young GC以后，大量对象进入老年代，老年代2分钟被塞满。而且老年代内存很大，FullGC 需要10s。
+
+![](./images/jvm-59.png)
+
+![](./images/jvm-60.png)
+
+用memory analyzer 观察内存分布。**由于1.7中 String.split()实现改变，导致出现大量对象**。
+
+在处理大量数据的时候，一次性加载过多数据需要优化。**优化思路是多线程开启加载，这样可以触发Young GC避免过多对象存活**
 

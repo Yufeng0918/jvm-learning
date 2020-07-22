@@ -1,0 +1,8 @@
+Java HotSpot(TM) 64-Bit Server VM (25.241-b07) for bsd-amd64 JRE (1.8.0_241-b07), built on Dec 11 2019 02:29:59 by "java_re" with gcc 4.2.1 (Based on Apple Inc. build 5658) (LLVM build 2336.11.00)
+Memory: 4k page, physical 16777216k(1008892k free)
+
+/proc/meminfo:
+
+CommandLine flags: -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:MaxNewSize=10485760 -XX:MaxTenuringThreshold=15 -XX:NewSize=10485760 -XX:OldPLABSize=16 -XX:PretenureSizeThreshold=10485760 -XX:+PrintGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:SurvivorRatio=8 -XX:+UseCompressedClassPointers -XX:+UseCompressedOops -XX:+UseConcMarkSweepGC -XX:+UseParNewGC 
+1399.130: [Full GC (Heap Dump Initiated GC) 1399.130: [CMS: 0K->1081K(10240K), 0.0044375 secs] 3484K->1081K(19456K), [Metaspace: 3623K->3623K(1056768K)], 0.0045609 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+1435.262: [Full GC (Heap Dump Initiated GC) 1435.262: [CMS: 1081K->999K(10240K), 0.0032172 secs] 1081K->999K(19456K), [Metaspace: 3623K->3623K(1056768K)], 0.0032986 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
