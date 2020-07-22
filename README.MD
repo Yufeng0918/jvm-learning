@@ -1218,3 +1218,134 @@ Young GC以后，大量对象进入老年代，老年代2分钟被塞满。而�
 + 永久代加载的类过多
 + 误调用System.gc()
 
+
+
+
+
+## 27. OOM 内存溢出
+
+### 27.1 内存溢出区域
+
+![](./images/jvm-61.png)
+
++ Metaspace: 存放class字节数组
++ 线程的虚拟机栈：方法执行
++ 堆空间：存放对象
+
+
+
+#### 27.1.1 Metaspace内存溢出
+
+metaspace一旦满了，就会触发Full GC。但是一旦GC回收不了多少类，JVM还在加载类到metaspace，就会发生metaspace内存溢出。
+
++ Metaspace 用默认值，只有几十MB，大型系统无法承载
++ 用cglib等动态技术生成的类过多，填满了metaspace
+
+
+
+```java
+public static void main(String[] args) {
+
+        while (true) {
+            Enhancer enhancer = new Enhancer();
+            enhancer.setSuperclass(Car.class);
+            enhancer.setUseCache(false);
+            enhancer.setCallback(new MethodInterceptor() {
+                @Override
+                public Object intercept(Object o, Method method, Object[] objects, MethodProxy methodProxy) throws Throwable {
+                    if (method.getName().endsWith("run")) {
+                        System.out.println("safety check");
+                        return methodProxy.invokeSuper(o, objects);
+                    } else {
+                        return methodProxy.invokeSuper(o, objects);
+                    }
+                }
+            });
+
+            Car car = (Car) enhancer.create();
+            car.run();
+        }
+    }
+
+    static class Car {
+        public void run() {
+            System.out.println("starting....");
+        }
+    }	
+```
+
+```bash
+-XX:NewSize=10485760 -XX:MaxNewSize=10485760 -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=15 -XX:PretenureSizeThreshold=10485760 -XX:MetaspaceSize=10m -XX:MaxMetaspaceSize=10m -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:wk12.Demo1.log
+```
+
+类对象无法回收，触发metaspace GC
+
+```
+2.015: [Full GC (Metadata GC Threshold) 2.015: [CMS: 1521K->1509K(10240K), 0.0090468 secs] 2012K->1509K(19456K), [Metaspace: 9679K->9679K(1058816K)], 0.0091825 secs] [Times: user=0.01 sys=0.00, real=0.00 secs] 
+2.024: [Full GC (Last ditch collection) 2.024: [CMS: 1509K->1509K(10240K), 0.0093476 secs] 1509K->1509K(19456K), [Metaspace: 9679K->9679K(1058816K)], 0.0094134 secs] [Times: user=0.00 sys=0.00, real=0.01 secs] 
+2.034: [GC (CMS Initial Mark) [1 CMS-initial-mark: 1509K(10240K)] 1509K(19456K), 0.0001516 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+2.034: [CMS-concurrent-mark-start]
+```
+
+
+
+
+
+#### 27.1.2 栈内存溢出
+
+```java
+	public static void main(String[] args) {
+            work();
+    }
+
+    public static void work() {
+        System.out.println("counter invoke " + (++counter));
+        work();
+    }
+```
+
+不停调用方法，每次方法都被压入方法栈中，直到方法栈内存耗尽，引发StackOverflowError
+
+```bash
+-XX:NewSize=10485760 -XX:MaxNewSize=10485760 -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=15 -XX:PretenureSizeThreshold=10485760 -XX:MetaspaceSize=10m -XX:MaxMetaspaceSize=10m -XX:ThreadStackSize=1m -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:wk12.Demo2.log
+```
+
+
+
+
+
+#### 27.1.3 堆内存溢出
+
+![](./images/jvm-62.png)
+
+```java
+public static void main(String[] args) {
+        long counter = 0;
+        List<Object> list = new ArrayList<>();
+        while (true) {
+            list.add(new Object());
+            System.out.println("create object " + (++counter));
+        }
+    }
+```
+
+```bash
+-Xms10m -Xmx10m -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=15 -XX:PretenureSizeThreshold=10485760 -XX:MetaspaceSize=10m -XX:MaxMetaspaceSize=10m -XX:ThreadStackSize=1m -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:wk12.Demo3.log
+```
+
+
+
+高并发场景下Young GC存活对象过多，survivor区域放不下，进入老年代。反复发送，最后老年代空间不足，发生OMM。
+
++ 大量货的对象引发OOM
++ 内存泄露，对象过多不能回收，引发OOM
+
+
+
+## 28. 案列分析：数据推送失败导致的OOM
+
+![](./images/jvm-63.png)
+
+Kafka故障，导致数据计算系统一直在重试，没有丢弃运算结果。导致内存里面的数据越来越多，大量存活对象占满新生代和老年代，导致OOM。
+
+**优化：如果kafa故障，允许丢弃计算结果**

@@ -6,3 +6,11 @@ Memory: 4k page, physical 16777216k(1008892k free)
 CommandLine flags: -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:MaxNewSize=10485760 -XX:MaxTenuringThreshold=15 -XX:NewSize=10485760 -XX:OldPLABSize=16 -XX:PretenureSizeThreshold=10485760 -XX:+PrintGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:SurvivorRatio=8 -XX:+UseCompressedClassPointers -XX:+UseCompressedOops -XX:+UseConcMarkSweepGC -XX:+UseParNewGC 
 1399.130: [Full GC (Heap Dump Initiated GC) 1399.130: [CMS: 0K->1081K(10240K), 0.0044375 secs] 3484K->1081K(19456K), [Metaspace: 3623K->3623K(1056768K)], 0.0045609 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
 1435.262: [Full GC (Heap Dump Initiated GC) 1435.262: [CMS: 1081K->999K(10240K), 0.0032172 secs] 1081K->999K(19456K), [Metaspace: 3623K->3623K(1056768K)], 0.0032986 secs] [Times: user=0.00 sys=0.00, real=0.00 secs] 
+Heap
+ par new generation   total 9216K, used 382K [0x00000007bec00000, 0x00000007bf600000, 0x00000007bf600000)
+  eden space 8192K,   4% used [0x00000007bec00000, 0x00000007bec5f968, 0x00000007bf400000)
+  from space 1024K,   0% used [0x00000007bf400000, 0x00000007bf400000, 0x00000007bf500000)
+  to   space 1024K,   0% used [0x00000007bf500000, 0x00000007bf500000, 0x00000007bf600000)
+ concurrent mark-sweep generation total 10240K, used 999K [0x00000007bf600000, 0x00000007c0000000, 0x00000007c0000000)
+ Metaspace       used 3631K, capacity 4540K, committed 4864K, reserved 1056768K
+  class space    used 399K, capacity 428K, committed 512K, reserved 1048576K

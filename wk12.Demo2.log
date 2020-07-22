@@ -1,0 +1,14 @@
+Java HotSpot(TM) 64-Bit Server VM (25.241-b07) for bsd-amd64 JRE (1.8.0_241-b07), built on Dec 11 2019 02:29:59 by "java_re" with gcc 4.2.1 (Based on Apple Inc. build 5658) (LLVM build 2336.11.00)
+Memory: 4k page, physical 16777216k(1827268k free)
+
+/proc/meminfo:
+
+CommandLine flags: -XX:CompressedClassSpaceSize=2097152 -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:MaxMetaspaceSize=10485760 -XX:MaxNewSize=10485760 -XX:MaxTenuringThreshold=15 -XX:MetaspaceSize=10485760 -XX:NewSize=10485760 -XX:OldPLABSize=16 -XX:PretenureSizeThreshold=10485760 -XX:+PrintGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:SurvivorRatio=8 -XX:ThreadStackSize=1048576 -XX:+UseCompressedClassPointers -XX:+UseCompressedOops -XX:+UseConcMarkSweepGC -XX:+UseParNewGC 
+Heap
+ par new generation   total 9216K, used 4962K [0x00000007fea00000, 0x00000007ff400000, 0x00000007ff400000)
+  eden space 8192K,  60% used [0x00000007fea00000, 0x00000007feed8828, 0x00000007ff200000)
+  from space 1024K,   0% used [0x00000007ff200000, 0x00000007ff200000, 0x00000007ff300000)
+  to   space 1024K,   0% used [0x00000007ff300000, 0x00000007ff300000, 0x00000007ff400000)
+ concurrent mark-sweep generation total 10240K, used 0K [0x00000007ff400000, 0x00000007ffe00000, 0x00000007ffe00000)
+ Metaspace       used 3165K, capacity 4500K, committed 4864K, reserved 1056768K
+  class space    used 342K, capacity 388K, committed 512K, reserved 1048576K
