@@ -1,4 +1,4 @@
-package jvm.learning.wk12;
+package jvm.learning.wk12.oom;
 
 import net.sf.cglib.proxy.Enhancer;
 import net.sf.cglib.proxy.MethodInterceptor;

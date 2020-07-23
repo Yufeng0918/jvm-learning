@@ -1,4 +1,4 @@
-package jvm.learning.wk12;
+package jvm.learning.wk12.oom;
 
 public class Demo2 {
 

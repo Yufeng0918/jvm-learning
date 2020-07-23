@@ -1334,11 +1334,11 @@ Exception in thread "main" java.lang.StackOverflowError
 	at java.io.PrintStream.write(PrintStream.java:527)
 	at java.io.PrintStream.print(PrintStream.java:669)
 	at java.io.PrintStream.println(PrintStream.java:806)
-	at jvm.learning.wk12.Demo2.work(Demo2.java:12)
-	at jvm.learning.wk12.Demo2.work(Demo2.java:13)
-	at jvm.learning.wk12.Demo2.work(Demo2.java:13)
-	at jvm.learning.wk12.Demo2.work(Demo2.java:13)
-	at jvm.learning.wk12.Demo2.work(Demo2.java:13)
+	at Demo2.work(Demo2.java:12)
+	at Demo2.work(Demo2.java:13)
+	at Demo2.work(Demo2.java:13)
+	at Demo2.work(Demo2.java:13)
+	at Demo2.work(Demo2.java:13)
 ```
 
 

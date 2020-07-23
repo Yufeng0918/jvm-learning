@@ -1,4 +1,4 @@
-package jvm.learning.wk8;
+package jvm.learning.wk8.fgc;
 
 public class Demo2 {
 

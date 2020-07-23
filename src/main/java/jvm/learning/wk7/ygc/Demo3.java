@@ -1,4 +1,4 @@
-package jvm.learning.wk7;
+package jvm.learning.wk7.ygc;
 
 public class Demo3 {
 

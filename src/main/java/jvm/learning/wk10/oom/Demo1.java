@@ -1,4 +1,4 @@
-package jvm.learning.wk10;
+package jvm.learning.wk10.oom;
 
 import java.util.ArrayList;
 import java.util.List;
