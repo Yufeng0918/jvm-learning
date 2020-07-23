@@ -1224,7 +1224,7 @@ Young GC以后，大量对象进入老年代，老年代2分钟被塞满。而�
 
 ## 27. OOM 内存溢出
 
-### 27.1 内存溢出区域
+
 
 ![](./images/jvm-61.png)
 
@@ -1234,7 +1234,7 @@ Young GC以后，大量对象进入老年代，老年代2分钟被塞满。而�
 
 
 
-#### 27.1.1 Metaspace内存溢出
+### 27.1 Metaspace内存溢出
 
 metaspace一旦满了，就会触发Full GC。但是一旦GC回收不了多少类，JVM还在加载类到metaspace，就会发生metaspace内存溢出。
 
@@ -1275,7 +1275,7 @@ public static void main(String[] args) {
 ```
 
 ```bash
--XX:NewSize=10485760 -XX:MaxNewSize=10485760 -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=15 -XX:PretenureSizeThreshold=10485760 -XX:MetaspaceSize=10m -XX:MaxMetaspaceSize=10m -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:wk12.Demo1.log
+-XX:NewSize=10485760 -XX:MaxNewSize=10485760 -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=15 -XX:PretenureSizeThreshold=10485760 -XX:MetaspaceSize=10m -XX:MaxMetaspaceSize=10m -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:wk12.Demo1.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/user/local/app/oom
 ```
 
 类对象无法回收，触发metaspace GC
@@ -1289,9 +1289,15 @@ public static void main(String[] args) {
 
 
 
+通过MAT进行分析，找到CGLIB
+
+![](./images/jvm-64.png)
 
 
-#### 27.1.2 栈内存溢出
+
+
+
+### 27.2 栈内存溢出
 
 ```java
 	public static void main(String[] args) {
@@ -1307,14 +1313,37 @@ public static void main(String[] args) {
 不停调用方法，每次方法都被压入方法栈中，直到方法栈内存耗尽，引发StackOverflowError
 
 ```bash
--XX:NewSize=10485760 -XX:MaxNewSize=10485760 -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=15 -XX:PretenureSizeThreshold=10485760 -XX:MetaspaceSize=10m -XX:MaxMetaspaceSize=10m -XX:ThreadStackSize=1m -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:wk12.Demo2.log
+-XX:NewSize=10485760 -XX:MaxNewSize=10485760 -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=15 -XX:PretenureSizeThreshold=10485760 -XX:MetaspaceSize=10m -XX:MaxMetaspaceSize=10m -XX:ThreadStackSize=1m -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:wk12.Demo2.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/user/local/app/oom
 ```
 
 
 
+栈溢出信息
+
+```
+*** java.lang.instrument ASSERTION FAILED ***: "!errorOutstanding" with message transform method call failed at JPLISAgent.c line: 844
+Exception in thread "main" java.lang.StackOverflowError
+	at java.io.FileOutputStream.write(FileOutputStream.java:326)
+	at java.io.BufferedOutputStream.flushBuffer(BufferedOutputStream.java:82)
+	at java.io.BufferedOutputStream.flush(BufferedOutputStream.java:140)
+	at java.io.PrintStream.write(PrintStream.java:482)
+	at sun.nio.cs.StreamEncoder.writeBytes(StreamEncoder.java:221)
+	at sun.nio.cs.StreamEncoder.implFlushBuffer(StreamEncoder.java:291)
+	at sun.nio.cs.StreamEncoder.flushBuffer(StreamEncoder.java:104)
+	at java.io.OutputStreamWriter.flushBuffer(OutputStreamWriter.java:185)
+	at java.io.PrintStream.write(PrintStream.java:527)
+	at java.io.PrintStream.print(PrintStream.java:669)
+	at java.io.PrintStream.println(PrintStream.java:806)
+	at jvm.learning.wk12.Demo2.work(Demo2.java:12)
+	at jvm.learning.wk12.Demo2.work(Demo2.java:13)
+	at jvm.learning.wk12.Demo2.work(Demo2.java:13)
+	at jvm.learning.wk12.Demo2.work(Demo2.java:13)
+	at jvm.learning.wk12.Demo2.work(Demo2.java:13)
+```
 
 
-#### 27.1.3 堆内存溢出
+
+### 27.3 堆内存溢出
 
 ![](./images/jvm-62.png)
 
@@ -1330,7 +1359,7 @@ public static void main(String[] args) {
 ```
 
 ```bash
--Xms10m -Xmx10m -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=15 -XX:PretenureSizeThreshold=10485760 -XX:MetaspaceSize=10m -XX:MaxMetaspaceSize=10m -XX:ThreadStackSize=1m -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:wk12.Demo3.log
+-Xms10m -Xmx10m -XX:SurvivorRatio=8 -XX:MaxTenuringThreshold=15 -XX:PretenureSizeThreshold=10485760 -XX:MetaspaceSize=10m -XX:MaxMetaspaceSize=10m -XX:ThreadStackSize=1m -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:wk12.Demo3.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/user/local/app/oom
 ```
 
 
@@ -1340,7 +1369,9 @@ public static void main(String[] args) {
 + 大量货的对象引发OOM
 + 内存泄露，对象过多不能回收，引发OOM
 
+![](./images/jvm-65.png)
 
+MAT 内存分析，ArrayList太大放不下
 
 ## 28. 案列分析：数据推送失败导致的OOM
 
@@ -1349,3 +1380,77 @@ public static void main(String[] args) {
 Kafka故障，导致数据计算系统一直在重试，没有丢弃运算结果。导致内存里面的数据越来越多，大量存活对象占满新生代和老年代，导致OOM。
 
 **优化：如果kafa故障，允许丢弃计算结果**
+
+
+
+## 29. JVM监控
+
+### 29.1 JVM 监控体系
+
++ CPU负载，如果CPU负载过高，报警
++ 磁盘使用，剩余磁盘多少，如果磁盘不够报警
++ 网络负载
++ Full GC发生频率
+
+
+
+### 29.2 生产OMM内存快照
+
+-XX:+HeapDumpOnOutOfMemoryError
+
+-XX:HeapDumpPath=/user/local/app/oom
+
+```bash
+-Xms4096m -Xmx4096m -Xmn3072m -Xss1M -XX:Metaspace=256M -XX:MaxMetaspace=256M -XX:+UseParNewGC -XX:+UseConcMarkSweepGC –XX:CMSInitiatingOccupancyFraction=92 -XX:+UseCMSCompactAtFullCollection -XX:CMSFullGCsBeforeCompaction=0 -XX:+CMSParallelRemarkEnabled XX:+CMSScavengeBeforeRemark  -XX:+DisableExplicitGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -Xloggc:gc.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/user/local/app/oom
+```
+
+
+
+## 30. 案例分析：上百请求导致OOM崩溃
+
+```java
+http-nio-8080-exec-1089 java.lang.OutOfMemoryError
+```
+
+![](./images/jvm-67.png)
+
++ Max-http-header-size:10000000, 每个线程创建2个数组，每一个数组为10MB
++ 每秒100个请求，处理一个请求4秒，4秒内积压了400个请求。**系统在调用远程RPC服务的时候超时**。工作线程卡死在网络
+
+4秒内积压400个请求，每个请求创建800个数组，每个数组10MB内存，耗尽了8G内存，导致内存溢出。
+
+
+
+## 31. 案例分析：堆外内存引发的OOM
+
+![](./images/jvm-68.png)
+
+堆外内存，会在堆内建立一个DirectByteBuff, 而真正的ByteBuff对象在堆外。由操作系统直接管理。
+
+Jetty本身会创建DirectByteBuff去申请堆外内存空间，知道Eden区域满了，就会触发Young GC。
+
+**由于新生代的内存分配过小**，存活下来的DirectByteBuff对象无法放在survivor区，所以移到老年代。由于老年代一直没有被填满，所以不会触发Full GC，不会回收老年代的DirectByteBuff, 所以堆外的内存也无法被回收。
+
+Java NIO 考虑过DirectByteBuff对象没有人用的情况，所以**每次分配堆外内存，都会调用System.gc(),** 但是**被 -XX:+DisableExplicitGC 屏蔽，导致不生效**
+
+
+
+## 32. 案例分析：RPC调用引发的OOM
+
+![](./images/jvm-69.png)
+
+服务A调用了服务B， 服务A的类请求修改了，而没有通知服务B。服务B无法反序列化。服务B开辟4GB的byte[]数组保存requst。
+
+服务B开辟的内存空间过大，引发OOM。
+
+
+
+## 33. 案列分析：没有WHERE引发的OOM
+
+![](./images/jvm-70.png)
+
+MAT 分析内存溢出，点击Histogram按钮，找出占用内存最多的对象。
+
+![](./images/jvm-71.png)
+
+查看是哪个线程引发的OOM，发现main thread创建了过多的对象。

@@ -7,9 +7,10 @@ public class Demo3 {
 
     public static void main(String[] args) {
         long counter = 0;
-        List<Object> list = new ArrayList<>();
+//        List<Object> list = new ArrayList<>();
+        List<byte[]> list = new ArrayList<>();
         while (true) {
-            list.add(new Object());
+            list.add(new byte[128 * 1024]);
             System.out.println("create object " + (++counter));
         }
     }
