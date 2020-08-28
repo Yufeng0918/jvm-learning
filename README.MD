@@ -12,8 +12,6 @@ JVM 想要执行一个类，首先要加载类，在加载类之前，需要先�
 
 
 
-
-
 ### 1.2 类加载过程
 
 类加载的过程加载，验证，准备，解析，初始化。 
@@ -55,8 +53,6 @@ public class Kafka {
 
 ![](./images/jvm-03.png)
 
-
-
 类加载器遵循双亲委派机制，就是说，如果要加载一个类，先去为他的父类能不能加载，如果父类上面还有父类，就继续问，直到顶层。然后顶层说加载不了，就下派到子类，如果所有父类都加载不了，那就自己加载。这么做的好处是，不会重复加载一个类
 
 
@@ -76,9 +72,12 @@ public class Kafka {
 
 ![](./images/jvm-05.png)
 
-
-
 我们自己打包的war中的class 不会传到的上层类加载器中
+
+- commonLoader：Tomcat最基本的类加载器，加载路径中的class可以被Tomcat容器本身以及各个Webapp访问；
+- catalinaLoader：Tomcat容器私有的类加载器，加载路径中的class对于Webapp不可见；CATALINA_HOME/lib下的jar
+- sharedLoader：各个Webapp共享的类加载器，加载路径中的class对于所有Webapp可见，但是对于Tomcat容器不可见；
+- WebappClassLoader：各个Webapp私有的类加载器，加载路径中的class只对当前Webapp可见；
 
 
 
@@ -90,7 +89,7 @@ public class Kafka {
 
 **程序计数器(Program Counter)**：记录当前执行的字节码指令的位置，**多线程每个线程有自己的程序计数器**
 
-**Java虚拟机栈(Stack)**：存放方法创建时的栈帧，栈帧有方法的**局部变量表、操作数栈、动态链接、方法出口**等， **每个线程有自己的虚拟机栈**
+**Java虚拟机栈(VM Stack)**：存放方法创建时的栈帧，栈帧有方法的**局部变量表、操作数栈、动态链接、方法出口**等， **每个线程有自己的虚拟机栈**
 
 **堆内存(Heap)**：存放代码创建的各种对象
 
@@ -129,11 +128,7 @@ public class ReplicaManager {
 
 ![](./images/jvm-07.png)
 
-
-
 ![](./images/jvm-08.png)
-
-
 
 如果某个实例对象没有被任何一个方法的局部变量，类的静态变量，常量引用，那个这个对象实列就应该被回收掉，让他不再占用任何资源。JVM中的垃圾会被定期的后台垃圾回收线程清理掉，不断释放
 
@@ -193,15 +188,13 @@ public class Kafka {
 
 **-Xmn**为堆内存中新生代的大小，堆内存中扣除了新生代大小就剩老年代了。
 
-**-XX:PermSize****和**-XX:MaxPermSize**分别表示永久代的内存大小以及永久代允许扩张的最大内存，一般这两个参数也会设置成一样的大小。在JDK1.8时，不光方法区的名称从方法区变成了Metaspace元数据空间，这两个参数也相应的变成了**-XX:Metaspace**和**-XX:MaxMetaspace**。
+**-XX:PermSize**和**-XX:MaxPermSize**分别表示永久代的内存大小以及永久代允许扩张的最大内存，一般这两个参数也会设置成一样的大小。在JDK1.8时，不光方法区的名称从方法区变成了Metaspace元数据空间，这两个参数也相应的变成了**-XX:Metaspace**和**-XX:MaxMetaspace**。
 
 
 
 ### 4.3 支付系统内存设置
 
 ![](./images/jvm-14.png)
-
-
 
 支付系统业务场景非常复杂，就最核心的支付流程如下图，每当用户发起一个支付请求时，都会发送到商城中，商城此时会将支付请求转交给支付系统，此时支付系统内会生成一个支付订单对象，此时会流转回用户方选择支付方式，当支付系统接收到用户选择的支付方式后转交给第三方支付渠道支付，并将支付结果返回给支付系统。
 
@@ -225,8 +218,6 @@ public class Payorder {
 }
 ```
 
-
-
 每台机器，大概是一秒钟接收到30个订单的请求，然后在JVM的新生代中创建出来，一秒钟后处理完毕，就会被GC了。
 
 
@@ -235,9 +226,7 @@ public class Payorder {
 
 
 
-按如上文分析，**如果按每台机器30个订单对象的分析，那也只不过是30*0.5=15kb的内存占用**，其实是很小的。随着系统的运行，新生代中的订单对象越来越多，知道某一刻达到了内存的阈值，启动Minor GC，将对象回收，依次往复。
-
-因为此时分析的是最核心的支付流程，在订单创建的过程当中**肯定包含其他数十种对象的创建，不妨将数量级扩大10~20倍，一秒的内存占用量也就几百kb~1MB之间**。
+按如上文分析，**如果按每台机器30个订单对象的分析，那也只不过是30*0.5=15kb的内存占用**，其实是很小的。随着系统的运行，新生代中的订单对象越来越多，知道某一刻达到了内存的阈值，启动Minor GC，将对象回收，依次往复。因为此时分析的是最核心的支付流程，在订单创建的过程当中**肯定包含其他数十种对象的创建，不妨将数量级扩大10~20倍，一秒的内存占用量也就几百kb~1MB之间**。
 
 
 
@@ -247,11 +236,7 @@ public class Payorder {
 
 可以考虑购买8G的机器，分配4G给JVM， 这样将近1个小时才会触发Minor GC， 降低了GC的频率。**-Xms和-Xmx设置为3G，-Xmn设置为2G。**
 
-
-
 ![](./images/jvm-16.png)
-
-
 
 反面案例，新生代和老年代瞬间被占满，新生代频繁GC，老年代频繁GC并且垃圾回收速度慢，极大影响性能。
 
@@ -416,8 +401,6 @@ public class Kafka {
 
 200MB的对象不能放入survior区，因为每块survivor区域只有100MB空间，200MB对象会直接进入老年代
 
-
-
 ![](./images/jvm-23.png)
 
 第三次MinorGC 以后，老年代只有1.1G，是放不下1.2G对象的
@@ -442,11 +425,7 @@ public class Kafka {
 
 ![](./images/jvm-27.png)
 
-**新生代多线程**垃圾回收, **-XX:+UseParNewGC** 开启ParNew垃圾回收器
-
-默认垃圾回收线程数和CPU核树一样, **-XX:ParallelGCThreads**指定线程数量
-
-新生代标记的时候需要STOP THE WORLD，**标记处GC Root的少量存活对象**，移动到一个survivor区域，清空eden和另一个survivor
+**新生代多线程**垃圾回收, **-XX:+UseParNewGC** 开启ParNew垃圾回收器。默认垃圾回收线程数和CPU核树一样, **-XX:ParallelGCThreads**指定线程数量。**新生代标记的时候需要STOP THE WORLD**，**标记处GC Root的少量存活对象**，移动到一个survivor区域，清空eden和另一个survivor
 
 
 
@@ -736,12 +715,13 @@ Heap
 
 **GC (Allocation Failure**：分配内存失败，触发GC
 
-**ParNew: 3668K->399K(4608K), 0.0017235 sec**
+**ParNew: 3668K->399K(4608K), 0.0017235 sec 3668K->1425K(9728K)**
 
 + GC之前是3668k，**GC之后是399k**
 + GC执行时间是0.0017235s, 
 + 年轻代可用空间是4608 = 4096 + 512
 + array 占用3072， **有596的未知对象**
++ 3668K->1425K(9728K) 是总的堆空间
 
 **[Times: user=0.01 sys=0.00, real=0.00 secs]**： 本次gc消耗时间
 
@@ -865,7 +845,7 @@ public class Demo4 {
 
 
 
-```
+```shell
 CommandLine flags: -XX:InitialHeapSize=20971520 -XX:MaxHeapSize=20971520 -XX:MaxNewSize=10485760 -XX:MaxTenuringThreshold=15 -XX:NewSize=10485760 -XX:OldPLABSize=16 -XX:PretenureSizeThreshold=3145728 -XX:+PrintGC -XX:+PrintGCDetails -XX:+PrintGCTimeStamps -XX:SurvivorRatio=8 -XX:+UseCompressedClassPointers -XX:+UseCompressedOops -XX:+UseConcMarkSweepGC -XX:+UseParNewGC 
 0.068: [GC (Allocation Failure) 0.068: [ParNew (promotion failed): 6943K->7389K(9216K), 0.0026386 secs]0.071: [CMS: 8194K->6567K(10240K), 0.0019821 secs] 11039K->6567K(19456K), [Metaspace: 2669K->2669K(1056768K)], 0.0047844 secs] [Times: user=0.01 sys=0.01, real=0.01 secs] 
 Heap
@@ -1505,4 +1485,3 @@ jvm内存消耗超过50%内存，**导出内存快照。有ClassLoader加载了�
 + 改成阻塞队列，**定长1024**
 
 + **如果队列满了则阻塞**，不会再去消费kafka里面的数据
-
