@@ -294,6 +294,18 @@ JVM 想要执行一个类，首先要加载类，在加载类之前，需要先�
 
 ![](./images/jvm-82.png)
 
+
+
+```JAVA
+public class Kafka {
+	public static void main() {
+		ReplicaManager rm = new RplicaManage();
+	}
+}
+```
+
+![](./images/jvm-02.png)
+
 #### 加载
 
 类加载器去加载类
@@ -304,29 +316,53 @@ JVM 想要执行一个类，首先要加载类，在加载类之前，需要先�
 #### 链接
 
 + 验证: 主要是验证加载的字节码是否符合JVM规范，不然随便瞎写JVM也执行不了
-+ 准备: 给对象申请内存，然后给变量设置初始值，该设置0的设置0，该设置null的设置null
-+ 解析: 给符号引用变成直接引用
++ **准备: 给对象申请内存，然后给变量设置初始值**，该设置0的设置0，该设置null的设置null
++ 解析: 给符号引用变成直接引用，针对类，字段，接口
 
 #### 初始化
 
-+ 给变量赋值，准备阶段只是设置了初始值.
-+ 这个是核心阶段，执行类的初始化，如果发现这个类的父类没有初始化，会先暂停，然后去初始化父类
++ **初始化阶段就是执行类构造器方法 `<clinit>()` 的过程。**是 javac 编译器自动收集类中的所有**类变量的赋值动作和静态代码**块中的语句合并而来
++ **`<clinit>()` 不同于类的构造器。**（关联：**构造器是虚拟机视角下的 `<init>()`** ）
++ 若该类具有父类， JVM先执行父类的 `<clinit>()` 已经执行完毕。虚拟机必须保证一个类的 `<clinit>()` 方法在多线程下被同步加锁。
++ 这个是核心阶段，执行类的初始化，如果发现这个类的父类没有初始化，会先暂停，然后去初始化父类···
 
 ```java
-public class Kafka {
-	public static void main() {
-		ReplicaManager rm = new RplicaManage();
-	}
+public class ClassInitTest {
+    private static int num = 1;
+    static{
+       num = 2;
+       number = 20;
+    }
+   private static int number = 10;  //linking之prepare: number = 0 --> initial: 20 --> 10
+
 }
+
+static <clinit>()V
+   L0
+    LINENUMBER 8 L0
+    ICONST_1
+    PUTSTATIC jvm/learning/chapter02/classloading/ClassInitTest.num : I
+   L1
+    LINENUMBER 11 L1
+    ICONST_2
+    PUTSTATIC jvm/learning/chapter02/classloading/ClassInitTest.num : I
+   L2
+    LINENUMBER 12 L2
+    BIPUSH 20
+    PUTSTATIC jvm/learning/chapter02/classloading/ClassInitTest.number : I
+   L3
+    LINENUMBER 13 L3
+    GETSTATIC java/lang/System.out : Ljava/io/PrintStream;
+    GETSTATIC jvm/learning/chapter02/classloading/ClassInitTest.num : I
+    INVOKEVIRTUAL java/io/PrintStream.println (I)V
+   L4
+    LINENUMBER 17 L4
+    BIPUSH 10
+    PUTSTATIC jvm/learning/chapter02/classloading/ClassInitTest.number : I
+    RETURN
+    MAXSTACK = 2
+    MAXLOCALS = 0
 ```
-
-
-
-![](./images/jvm-02.png)
-
-
-
-
 
 
 
